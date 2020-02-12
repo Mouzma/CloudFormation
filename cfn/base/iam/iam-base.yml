@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: Name for the project.
+  EnvironmentType:
+    Type: String
+    Default: Dev
+    AllowedValues: [Dev, Staging, Prod]
+      # - Dev
+      # - Staging
+      # - Prod
+    Description: Type of the environment.
+  IAMPolicyName: 
+    Type: String
+    Description: Name for the policy given by user.
+  IAMPolicyResource:
+    Type: String 
+    Description: Resources on which actions will be performed.
+  # IAMPolicyResource:
+  #   Type: CommaDelimitedList 
+  #   Description: Resources on which actions will be performed.
+
+Resources:
+  IAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+  IAMPolicies:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Ref IAMPolicyName
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+            - 's3:Get*'
+            - 's3:List*'
+          Resource: !Ref IAMPolicyResource
+          # Resource:
+          #   !Join
+          # - ","
+          # - !Ref IAMPolicyResource
+      Roles:
+      - !Ref IAMRole

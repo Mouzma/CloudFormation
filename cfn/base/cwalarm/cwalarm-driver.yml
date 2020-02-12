@@ -1,0 +1,27 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CloudWatch Alarm Template"
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: devops-training
+    Description: Name for the project.
+  EnvironmentType:
+    Type: String
+    Default: Dev
+    AllowedValues: [Dev, Staging, Prod]
+    Description: Type of the environment.
+
+  CwAlarmBaseTemplateUrl:
+    Type: String
+    Description: "URL for CwAlarm base template."
+    Default: https://cfntemplateforcloudwatchalarm.s3.amazonaws.com/cwalarm-base.yml
+    
+Resources:
+  CwAlarm:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref CwAlarmBaseTemplateUrl
+      Parameters:
+        ProjectName: !Sub ${ProjectName}
+        EnvironmentType: !Sub ${EnvironmentType}

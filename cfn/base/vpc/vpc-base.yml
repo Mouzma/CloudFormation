@@ -1,0 +1,354 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "VPC Template"
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: devops-training
+    Description: Name for the project.
+  EnvironmentType:
+    Type: String
+    Default: Dev
+    AllowedValues: [Dev, Staging, Prod]
+    Description: Type of the environment.
+  VpcCIDR:
+    Type: String
+    Default: 10.192.0.0/16
+    Description: IP CIDR range for this VPC
+  VpcDnsSupport:
+    Type: String
+    Default: true
+    AllowedValues: [true, false]
+    Description: Enable or Disable DNS support
+  VpcDnsHostnames: 
+    Type: String
+    Default: true
+    AllowedValues: [true, false]
+    Description: Enable or Disable DNS hostnames
+  PublicSubnetCidr01: 
+    Type: String
+  #  Default: 10.192.10.0/24
+    Description: IP CIDR range for the public subnet in the first AZ
+  PrivateSubnetCidr01:
+    Type: String
+  #  Default: 10.192.20.0/24
+    Description: IP CIDR range for the private subnet in the first AZ
+  PublicSubnetCidr02: 
+    Type: String
+  #  Default: 10.192.30.0/24
+    Description: IP CIDR range for the public subnet in the first AZ
+  PrivateSubnetCidr02:
+    Type: String
+  #  Default: 10.192.40.0/24
+    Description: IP CIDR range for the private subnet in the first AZ
+  PublicSubnetCidr03: 
+    Type: String
+  # Default: 10.192.10.0/24
+    Description: IP CIDR range for the public subnet in the first AZ
+  PrivateSubnetCidr03:
+    Type: String
+  #  Default: 10.192.20.0/24
+    Description: IP CIDR range for the private subnet in the first AZ
+  PublicSubnetCidr04: 
+    Type: String
+  #  Default: 10.192.10.0/24
+    Description: IP CIDR range for the public subnet in the first AZ
+  PrivateSubnetCidr04:
+    Type: String
+  #  Default: 10.192.20.0/24
+    Description: IP CIDR range for the private subnet in the first AZ
+  PublicSubnetCidr05: 
+    Type: String
+  #  Default: 10.192.10.0/24
+    Description: IP CIDR range for the public subnet in the first AZ
+  PrivateSubnetCidr05:
+    Type: String
+  #  Default: 10.192.20.0/24
+    Description: IP CIDR range for the private subnet in the first AZ
+  PublicSubnetCidr06: 
+    Type: String
+  # Default: 10.192.10.0/24
+    Description: IP CIDR range for the public subnet in the first AZ
+  PrivateSubnetCidr06:
+    Type: String
+  # Default: 10.192.20.0/24
+    Description: IP CIDR range for the private subnet in the first AZ
+
+Conditions:
+  isAz01: !Not [!Equals [ !Ref PublicSubnetCidr01 , ""]]
+  isAz02: !Not [!Equals [ !Ref PublicSubnetCidr02 , ""]]
+  isAz03: !Not [!Equals [ !Ref PublicSubnetCidr03 , ""]]
+  isAz04: !Not [!Equals [ !Ref PublicSubnetCidr04 , ""]]
+  isAz05: !Not [!Equals [ !Ref PublicSubnetCidr05 , ""]]
+  isAz06: !Not [!Equals [ !Ref PublicSubnetCidr06 , ""]]
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: !Ref VpcDnsSupport #SA: Param
+      EnableDnsHostnames: !Ref VpcDnsHostnames
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+  PublicSubnet01:
+    Type: AWS::EC2::Subnet
+    Condition: isAz01
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnetCidr01
+      MapPublicIpOnLaunch: true
+  PrivateSubnet01:
+    Type: AWS::EC2::Subnet
+    Condition: isAz01
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnetCidr01
+      MapPublicIpOnLaunch: false
+  NatGatewayEip01: 
+    Type: AWS::EC2::EIP
+    Condition: isAz01
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+  NatGateway01:
+    Type: AWS::EC2::NatGateway
+    Condition: isAz01
+    Properties:
+      AllocationId: !GetAtt NatGatewayEip01.AllocationId
+      SubnetId: !Ref PublicSubnet01
+  PublicRouteTable01:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+  PublicRoute01:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable01
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  RouteTableAssociationPublicSubnet01:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: isAz01
+    Properties:
+      RouteTableId: !Ref PublicRouteTable01
+      SubnetId: !Ref PublicSubnet01
+  PrivateRouteTable01:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+  PrivateRoute01:
+    Type: AWS::EC2::Route
+    Condition: isAz01
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable01
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway01
+  RouteTableAssociationPrivateSubnet01:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: isAz01
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable01
+      SubnetId: !Ref PrivateSubnet01
+  PublicSecurityGroup:
+        Type: AWS::EC2::SecurityGroup
+        Condition: isAz01
+        Properties:
+            GroupDescription: "Allow http to client host"
+            VpcId: !Ref VPC
+            SecurityGroupIngress:
+                - IpProtocol: tcp
+                  FromPort: 22
+                  ToPort: 22
+                  CidrIp: 0.0.0.0/0
+
+
+  PublicSubnet02:
+    Type: AWS::EC2::Subnet
+    Condition: isAz02
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnetCidr02
+      MapPublicIpOnLaunch: true
+  PrivateSubnet02:
+    Type: AWS::EC2::Subnet
+    Condition: isAz02
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnetCidr02
+      MapPublicIpOnLaunch: false
+  RouteTableAssociationPublicSubnet02:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: isAz02
+    Properties:
+      RouteTableId: !Ref PublicRouteTable01
+      SubnetId: !Ref PublicSubnet02
+  RouteTableAssociationPrivateSubnet02:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: isAz02
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable01
+      SubnetId: !Ref PrivateSubnet02
+
+
+  PublicSubnet03:
+    Type: AWS::EC2::Subnet
+    Condition: isAz03
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 2, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnetCidr03
+      MapPublicIpOnLaunch: true
+  PrivateSubnet03:
+    Type: AWS::EC2::Subnet
+    Condition: isAz03
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 2, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnetCidr03
+      MapPublicIpOnLaunch: false
+  RouteTableAssociationPublicSubnet02:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: isAz03
+    Properties:
+      RouteTableId: !Ref PublicRouteTable01
+      SubnetId: !Ref PublicSubnet03
+  RouteTableAssociationPrivateSubnet01:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: isAz03
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable01
+      SubnetId: !Ref PrivateSubnet03
+
+  PublicSubnet04:
+    Type: AWS::EC2::Subnet
+    Condition: isAz04
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 3, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnetCidr04
+      MapPublicIpOnLaunch: true
+  PrivateSubnet04:
+    Type: AWS::EC2::Subnet
+    Condition: isAz04
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 3, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnetCidr04
+      MapPublicIpOnLaunch: false
+  RouteTableAssociationPublicSubnet04:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: isAz04
+    Properties:
+      RouteTableId: !Ref PublicRouteTable01
+      SubnetId: !Ref PublicSubnet04
+  RouteTableAssociationPrivateSubnet04:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: isAz04
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable01
+      SubnetId: !Ref PrivateSubnet04
+
+  PublicSubnet05:
+    Type: AWS::EC2::Subnet
+    Condition: isAz05
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 4, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnetCidr05
+      MapPublicIpOnLaunch: true
+  PrivateSubnet05:
+    Type: AWS::EC2::Subnet
+    Condition: isAz05
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 4, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnetCidr05
+      MapPublicIpOnLaunch: false
+  RouteTableAssociationPublicSubnet05:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: isAz05
+    Properties:
+      RouteTableId: !Ref PublicRouteTable01
+      SubnetId: !Ref PublicSubnet05
+  RouteTableAssociationPrivateSubnet05:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: isAz05
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable01
+      SubnetId: !Ref PrivateSubnet05
+
+  PublicSubnet06:
+    Type: AWS::EC2::Subnet
+    Condition: isAz06
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 5, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnetCidr06
+      MapPublicIpOnLaunch: true
+  PrivateSubnet06:
+    Type: AWS::EC2::Subnet
+    Condition: isAz06
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 5, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnetCidr06
+      MapPublicIpOnLaunch: false
+  RouteTableAssociationPublicSubnet06:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: isAz06
+    Properties:
+      RouteTableId: !Ref PublicRouteTable01
+      SubnetId: !Ref PublicSubnet06
+  RouteTableAssociationPrivateSubnet06:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: isAz06
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable01
+      SubnetId: !Ref PrivateSubnet06
+                  
+
+
+
+
+  # PrivateSecurityGroup: #SA: Comment ID
+  #       Type: AWS::EC2::SecurityGroup
+  #       Condition: IsAvailablePrivateSubnet1
+  #       Properties:
+  #           GroupDescription: "Allow http to client host"
+  #           VpcId: !Ref VPC
+  #           SecurityGroupIngress:
+  #               - IpProtocol: tcp
+  #                 FromPort: 22
+  #                 ToPort: 22
+  #                 SourceSecurityGroupId: !Ref PublicSecurityGroup
+
+
+Outputs:
+  VPC:
+    Description: VPC ID
+    Value: !Ref VPC
+    Export:
+      Name: VPC
+
+  PublicSubnet1:
+    Description: Public subnet ID in Az01
+    Value: !Ref PublicSubnet01
+    Export:
+      Name: PublicSubnetAz01
+
+  PrivateSubnet1:
+    Description: Private subnet ID in Az01
+    Value: !Ref PrivateSubnet01
+    Export:
+      Name: PrivateSubnetAz01

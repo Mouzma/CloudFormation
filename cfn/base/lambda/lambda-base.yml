@@ -1,0 +1,40 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Lambda cfn template"
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: devops-training
+    Description: Name for the project.
+  EnvironmentType:
+    Type: String
+    Default: Dev
+    AllowedValues: [Dev, Staging, Prod]
+    Description: Type of the environment.
+
+Resources:
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties: 
+        Runtime: python3.7
+        Role: arn:aws:iam::873415281914:role/lambda_admin_access
+        Handler: index.handler
+        Code: 
+          ZipFile: |
+            import boto3
+            sqs=boto3.client('sqs')
+            queue = sqs.create_queue(
+            QueueName='myfirstqueue'
+            )
+  LambdaFunctionEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 10
+      Enabled: true
+      EventSourceArn: !GetAtt Queue.Arn
+      FunctionName: !GetAtt LambdaFunction.Arn
+  Queue:
+    Type: AWS::SQS::Queue
+    Properties:
+      DelaySeconds: 0
+      VisibilityTimeout: 120

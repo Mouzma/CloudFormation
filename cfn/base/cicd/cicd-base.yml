@@ -1,0 +1,185 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CICD cfn template"
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: devops-training
+    Description: Name for the project.
+  EnvironmentType:
+    Type: String
+    Default: Dev
+    AllowedValues: [Dev, Staging, Prod]
+    Description: Type of the environment.
+  CodePipelineRole:
+    Type: String
+  SourceS3Bucket:
+    Type: String
+  SourceS3ObjectKey:
+    Type: String
+  S3BucketArtifactStore:
+    Type: String
+
+
+Resources:
+
+# CodeCommitRepo:
+#   Type: AWS::CodeCommit::Repository
+#   Properties: 
+#     RepositoryName: cicdrepo
+#     RepositoryDescription: Repository for CI CD
+#     Code: 
+#         S3: 
+#           Bucket: codeforcicdpractice
+#           Key: SampleApp_Linux.zip
+
+  # Ec2Instance: 
+  #   Type: AWS::EC2::Instance
+  #   Properties: 
+  #     ImageId: !GetAtt Ec2Instance.ImageId
+  #     InstanceType: t2.micro
+  #     KeyName: !Ref KeyName
+  #     IamInstanceProfile: !Ref EC2InstanceProfile
+  #     SecurityGroups:
+  #     SubnetId:
+  #     Tenancy: Default
+  #     UserData: 
+  #     Tags:
+  #       - Key: Name
+  #         Value: CiCdDemo
+
+
+  # EC2Role: 
+  #   Type: "AWS::IAM::Role"
+  #   Properties: 
+  #     AssumeRolePolicyDocument: 
+  #       Version: "2012-10-17"
+  #       Statement: 
+  #         - 
+  #           Effect: "Allow"
+  #           Principal: 
+  #             Service: 
+  #               - "ec2.amazonaws.com"
+  #           Action: 
+  #             - "sts:AssumeRole"
+  #     Path: "/"
+  # EC2RolePolicies: 
+  #   Type: "AWS::IAM::Policy"
+  #   Properties: 
+  #     PolicyName: "ec2forcodedeploy"
+  #     PolicyDocument: 
+  #       Version: "2012-10-17"
+  #       Statement: 
+  #         - 
+  #           Effect: "Allow"
+  #           Action: "*"
+  #           Resource: "*"
+  #     Roles: 
+  #       - 
+  #         !Ref EC2Role
+  # EC2InstanceProfile: 
+  #   Type: "AWS::IAM::InstanceProfile"
+  #   Properties: 
+  #     Path: "/"
+  #     Roles: 
+  #       - 
+  #         !Ref EC2Role
+
+  CodeDeployApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties: 
+      ApplicationName: CiCdDemo
+      ComputePlatform: Server
+
+  CodeDeployRole: 
+      Type: "AWS::IAM::Role"
+      Properties: 
+        AssumeRolePolicyDocument: 
+          Version: "2012-10-17"
+          Statement: 
+            - 
+              Effect: "Allow"
+              Principal: 
+                Service: 
+                  - "codedeploy.amazonaws.com"
+              Action: 
+                - "sts:AssumeRole"
+        Path: "/"
+  CodeDeployRolePolicies: 
+      Type: "AWS::IAM::Policy"
+      Properties: 
+        PolicyName: "codedeployforcodedeploy"
+        PolicyDocument: 
+          Version: "2012-10-17"
+          Statement: 
+            - 
+              Effect: "Allow"
+              Action: "*"
+              Resource: "*"
+        Roles: 
+          - 
+            !Ref CodeDeployRole
+
+
+  DeploymentGroup: 
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties: 
+      ApplicationName: !Ref CodeDeployApplication
+      # Deployment: 
+      #   Description: "First time"
+      #   IgnoreApplicationStopFailures: true
+      #   Revision:
+      #     RevisionType: S3
+      #     S3Location: 
+      #       Bucket: !Ref BucketName
+      #       Key: !Ref BucketKey
+      #       BundleType: Zip
+      Ec2TagFilters: 
+        - 
+          Key: Name
+          Value: ec2codedeploy
+          Type: KEY_AND_VALUE
+      ServiceRoleArn: !GetAtt CodeDeployRole.Arn
+
+  AppPipeline: 
+    Type: AWS::CodePipeline::Pipeline 
+    Properties: 
+      RoleArn: !Ref CodePipelineRole #(input from user)
+      Stages: 
+        - 
+          Name: Source 
+          Actions: 
+            - 
+              Name: SourceAction
+              ActionTypeId: 
+                Category: Source 
+                Owner: AWS 
+                Version: 1 
+                Provider: S3 
+              OutputArtifacts: 
+                - 
+                  Name: SourceOutput 
+              Configuration: 
+                S3Bucket: !Ref SourceS3Bucket #(bucket with app)
+                S3ObjectKey: !Ref SourceS3ObjectKey  #(zip file)
+              RunOrder: 1 
+        - 
+          Name: Release 
+          Actions: 
+            - 
+              Name: ReleaseAction
+              InputArtifacts: 
+                - 
+                  Name: SourceOutput 
+              ActionTypeId: 
+                Category: Deploy 
+                Owner: AWS 
+                Version: 1
+                Provider: CodeDeploy 
+              Configuration: 
+                ApplicationName: !Ref CodeDeployApplication
+                DeploymentGroupName: !Ref DeploymentGroup 
+              RunOrder: 1 
+      ArtifactStore: 
+        Type: S3 
+        Location: !Ref S3BucketArtifactStore   # name of an s3 bucket (INPUT)
