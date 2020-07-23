@@ -4,7 +4,7 @@ Description: "VPC Template"
 Parameters:
   ProjectName:
     Type: String
-    Default: devops-training
+    Default: Project
     Description: Name for the project.
   EnvironmentType:
     Type: String
