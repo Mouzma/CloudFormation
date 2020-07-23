@@ -1,0 +1,270 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Aurora MySQL Cluster
+# Parameters
+Parameters: 
+  Project:
+    Type: String
+    Default: ORR
+    Description: Project Name
+  Environment:
+    Type: String
+    Default: dev
+    Description: Environment for deployments
+  # Variables for Parameter Group 
+  PGFamily:
+    Type: String
+    Default: aurora-mysql5.7
+    Description: Family for Parameter Group
+  # Variables for Subnet Group 
+  SGName:
+    Type: String
+    Default: subnetgroup
+    Description: Name for Subnet Group
+ # Variables for RDS Instance
+  DBInstanceClass:
+    Type: String
+    Default: db.t2.medium
+    AllowedValues:
+      - db.t2.small
+      - db.t2.medium
+      - db.t2.large
+    Description: Instance class for DB
+  DeletionProtection:
+    Type: String
+    Default: false
+    AllowedValues: [false,true]
+    Description: Specify whether to enable the DB instance deletion protection or not
+  Engine:
+    Type: String
+    AllowedValues:
+    - aurora
+    - 'aurora-mysql'
+    Default: aurora-mysql
+    Description: Aurora engine for DB instances
+  # PubliclyAccessible:
+  #   Type: String
+  #   Default: true
+  #   AllowedValues: [false,true]
+  #   Description: Indicates whether the DB instance is an internet-facing instance or not
+  # Variables for DB Cluster
+  ClusterBackupRetentionPeriod:
+    Type: Number
+    Default: 30
+    MinValue: 1
+    MaxValue: 35
+    Description: The number of days to keep snapshots of the cluster
+  ClusterDatabaseName:
+    Type: String
+    Default: ''
+    Description: Name of the database (ignored when DBSnapshotIdentifier is set, value used from snapshot)
+  ClusterEngineMode:
+    Type: String
+    Default: provisioned
+    Description: Database engine mode 
+  MasterUser:
+    Type: String
+    NoEcho: true
+    MinLength: 1
+    MaxLength: 16
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
+    Description: Username for the database admin account
+    ConstraintDescription: Master Username must start with a letter. Must contain 1 to 16 alphanumeric characters.
+  MasterPassword: 
+    Type: String
+    NoEcho: true
+    MinLength: 1
+    MaxLength: 41
+    AllowedPattern: "[a-zA-Z0-9]+"
+    Description: Password for the database admin account
+    ConstraintDescription: Master Password must be at least eight characters long.
+  Port: 
+    Type: String
+    Default: "3306"
+    Description: Port for DB Instance 
+  PreferredBackupWindow:
+    Type: String
+    Default: '09:54-10:24'
+    Description: The daily time range in UTC during which you want to create automated backups.
+  PreferredMaintenanceWindow:
+    Type: String
+    Default: 'sat:07:00-sat:07:30'
+    Description: The weekly time range (in UTC) during which system maintenance can occur.
+
+
+# Mappings
+Mappings:
+  EngineMap:
+    aurora:
+      Engine: aurora
+      EngineVersion: '5.6.10a'
+      Port: 3306
+      ClusterParameterGroupFamily: 'aurora5.6'
+      ParameterGroupFamily: 'aurora5.6'
+    'aurora-mysql':
+      Engine: 'aurora-mysql'
+      EngineVersion: '5.7.12'
+      Port: 3306
+      ClusterParameterGroupFamily: 'aurora-mysql5.7'
+      ParameterGroupFamily: 'aurora-mysql5.7'
+
+
+# Resources
+Resources:
+  # Security Group for RDS Cluster
+  RdsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Allow 3306 to client host"
+      VpcId: vpc-0c2aa159c94900977
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: 0.0.0.0/0
+  # Parameter Group for RDS Cluster
+  ClusterParameterGroup:
+    Type: AWS::RDS::DBClusterParameterGroup
+    Properties: 
+      Description: DB Cluster Parameter Group
+      Family: !Ref PGFamily
+      Parameters: 
+          time_zone: US/Eastern
+      Tags: 
+        - Key: Name
+          Value:
+            Fn::Join:
+            - "-"
+            - - !Ref Project
+              - ParameterGroup
+              - Ref: Environment
+        - Key: Environment
+          Value: !Ref Environment
+  # Parameter group for DB Instance
+  InstanceParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties: 
+      Description: DB Instance Parameter Group
+      Family: !Ref PGFamily
+      Parameters: 
+        sql_mode: IGNORE_SPACE 
+      Tags: 
+        - Key: Name
+          Value:
+            Fn::Join:
+            - "-"
+            - - !Ref Project
+              - ParameterGroup
+              - Ref: Environment
+        - Key: Environment
+          Value: !Ref Environment
+  # Subnet Group for RDS Cluster and Instance
+  SubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties: 
+      DBSubnetGroupDescription: DB Cluster Subnet Group
+      DBSubnetGroupName: !Ref SGName
+      SubnetIds:
+        - subnet-06fa7e0ed346302f9
+        - subnet-0cc8cbb043ad3dbb8
+      Tags: 
+        - Key: Name
+          Value:
+            Fn::Join:
+            - "-"
+            - - SubnetGroup
+              - Ref: Environment
+        - Key: Environment
+          Value: !Ref Environment
+  # DB Cluster
+  RDSCluster:
+    Type: AWS::RDS::DBCluster
+    Properties:
+      BackupRetentionPeriod: !Ref ClusterBackupRetentionPeriod
+      DatabaseName: !Ref ClusterDatabaseName
+      DBClusterParameterGroupName: !Ref ClusterParameterGroup
+      DBSubnetGroupName: !Ref SubnetGroup
+      Engine: !FindInMap [EngineMap, !Ref Engine, Engine]
+      EngineMode: !Ref ClusterEngineMode
+      EngineVersion: !FindInMap [EngineMap, !Ref Engine, EngineVersion]
+      MasterUsername: !Ref MasterUser
+      MasterUserPassword: !Ref MasterPassword
+      Port: !FindInMap [EngineMap, !Ref Engine, Port] # or !Ref Port
+      PreferredBackupWindow: !Ref PreferredBackupWindow
+      PreferredMaintenanceWindow: !Ref PreferredMaintenanceWindow
+      StorageEncrypted: false
+      Tags: 
+        - Key: Name
+          Value:
+            !Join 
+            - "-"
+            - - !Ref Project
+              - rds-cluster
+              - !Ref Environment
+        - Key: Environment
+          Value: !Ref Environment
+      VpcSecurityGroupIds: 
+        - !Ref RdsSecurityGroup
+ 
+  # RDS Instance:
+  RDSIntanceWriter:
+    Type: AWS::RDS::DBInstance
+    DependsOn: RdsSecurityGroup
+    Properties: 
+      AllowMajorVersionUpgrade: false
+      AutoMinorVersionUpgrade: true
+      DBClusterIdentifier: !Ref RDSCluster
+      DBInstanceClass: !Ref DBInstanceClass
+      DBParameterGroupName: !Ref InstanceParameterGroup
+      DBSubnetGroupName: !Ref SubnetGroup
+      CACertificateIdentifier: rds-ca-2019
+      DBInstanceIdentifier: 
+        Fn::Join:
+         - '-'
+         - - !Ref Project
+           - !Ref Environment
+           - "db-instance-writer"
+      Engine: !FindInMap [EngineMap, !Ref Engine, Engine]
+      Tags: 
+        - Key: Name
+          Value: !Ref Project
+        - Key: Environment
+          Value: !Ref Environment
+
+  RDSIntanceReader:
+    Type: AWS::RDS::DBInstance
+    DependsOn: RdsSecurityGroup
+    Properties: 
+      AllowMajorVersionUpgrade: false
+      AutoMinorVersionUpgrade: true
+      DBClusterIdentifier: !Ref RDSCluster
+      DBInstanceClass: !Ref DBInstanceClass
+      DBParameterGroupName: !Ref InstanceParameterGroup
+      DBSubnetGroupName: !Ref SubnetGroup
+      CACertificateIdentifier: rds-ca-2019
+      DBInstanceIdentifier: 
+        Fn::Join:
+         - '-'
+         - - !Ref Project
+           - !Ref Environment
+           - "db-instance-reader"
+      Engine: !FindInMap [EngineMap, !Ref Engine, Engine]
+      Tags: 
+        - Key: Name
+          Value: !Ref Project
+        - Key: Environment
+          Value: !Ref Environment
+
+# Outputs
+Outputs:
+  StackName:
+    Description: 'Stack name.'
+    Value: !Sub '${AWS::StackName}'
+  ClusterName:
+    Description: 'The name of the cluster.'
+    Value: !Ref RDSCluster
+    Export:
+      Name: !Sub '${AWS::StackName}-ClusterName'
+
+
+
+    
