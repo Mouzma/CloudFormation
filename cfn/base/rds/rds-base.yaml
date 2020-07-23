@@ -4,7 +4,7 @@ Description: Aurora MySQL Cluster
 Parameters: 
   Project:
     Type: String
-    Default: ORR
+    Default: Project
     Description: Project Name
   Environment:
     Type: String
